@@ -14,7 +14,7 @@ classdef DataLogger < handle
     methods
         function this = DataLogger(bufferSize, dataClassName, validateFuncHandles)
             arguments
-                bufferSize (1, 1) double {mustBePositive, mustBeInteger}
+                bufferSize (1, 1) double {mustBeNonnegative, mustBeInteger} = 0
                 dataClassName (1, 1) string = ""
                 validateFuncHandles (1, :) {mustBeFunctionHandleCell} = {}
             end
@@ -30,13 +30,33 @@ classdef DataLogger < handle
             this.Buffer = cell(1, this.BufferSize);
         end
         
+        function resize(this, newBufferSize)
+            
+            validateattributes(newBufferSize, {'double'}, {'scalar', 'nonnegative', 'integer'});
+            
+            if this.CurrentIndex > newBufferSize
+                error("変更後のサイズよりも格納されているデータが多いためサイズを変更できません");
+            end
+            this.BufferSize = newBufferSize;
+            oldData = getBuffer(this);
+            reset(this);
+            
+            for i = 1 : length(oldData)
+                this.append(oldData{i});
+            end
+        end
+        
         function append(this, data)
             % validate append data
-            if ~isa(data, this.DataClassName)
-                error('Invalid data class append. Expected class: %s Data class: %s', this.DataClassName, class(data));
+            if (this.DataClassName ~= "")
+                if ~isa(data, this.DataClassName)
+                    error('Invalid data class append. Expected class: %s Data class: %s', this.DataClassName, class(data));
+                end
             end
-            cellfun(@(x) x(data), this.ValidateFuncHandles)
             
+            if (~isempty(this.ValidateFuncHandles))
+                cellfun(@(x) x(data), this.ValidateFuncHandles)
+            end
             if this.CurrentIndex == this.BufferSize
                 error("Buffer is full");
             end
